@@ -1,7 +1,0 @@
-[
-  { "firstName": "František", "surname": "Novák", "parish": "Brno", "year": 1821, "type": "Narození", "link": "#" },
-  { "firstName": "Marie", "surname": "Dvořáková", "parish": "Zlín", "year": 1840, "type": "Sňatek", "link": "#" },
-  { "firstName": "Josef", "surname": "Svoboda", "parish": "Olomouc", "year": 1865, "type": "Úmrtí", "link": "#" },
-  { "firstName": "Anna", "surname": "Kučerová", "parish": "Uherské Hradiště", "year": 1855, "type": "Narození", "link": "#" },
-  { "firstName": "Pavel", "surname": "Novák", "parish": "Brno", "year": 1830, "type": "Sňatek", "link": "#" }
-]
