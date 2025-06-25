@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <title>Moravian Genealogy Search</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 1em;
+    }
+
+    .tab-button {
+      padding: 0.5em 1em;
+      margin-right: 0.3em;
+      border: 1px solid #aaa;
+      background-color: #f0f0f0;
+      cursor: pointer;
+      font-size: 0.9em;
+    }
+
+    .tab-button.active {
+      background-color: #dfefff;
+      border-color: #66a;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1em;
+    }
+
+    th, td {
+      border: 1px solid #aaa;
+      padding: 0.5em;
+      text-align: left;
+    }
+
+    input, select {
+      margin-right: 1em;
+      margin-top: 0.5em;
+      padding: 0.3em;
+    }
+  </style>
+</head>
+<body>
+
+<!-- HOME PAGE -->
+<div id="homeSection">
+  <h2>Welcome to Moravian Genealogy Search</h2>
+  <p>Search historical records from Moravia by surname, region, and record type.</p>
+  <button onclick="startSearch()">Begin Search</button>
+</div>
+
+<!-- SEARCH PAGE -->
+<div id="searchSection" style="display: none;">
+  <!-- Tabs -->
+  <div id="tabs" style="margin-bottom: 1em;">
+    <button onclick="setTypeFilter('')" class="tab-button active">📋 All</button>
+    <button onclick="setTypeFilter('Narození')" class="tab-button">🍼 Births</button>
+    <button onclick="setTypeFilter('Sňatek')" class="tab-button">💍 Marriages</button>
+    <button onclick="setTypeFilter('Úmrtí')" class="tab-button">⚰️ Deaths</button>
+  </div>
+
+  <!-- Filters -->
+  <label for="surname">Příjmení / Surname:</label>
+  <input type="text" id="surname" placeholder="e.g. Novak" oninput="searchRecords()" />
+
+  <label for="region">Farnost / Parish:</label>
+  <select id="region" onchange="searchRecords()">
+    <option value="">Všechny / All</option>
+  </select>
+
+  <!-- Table -->
+  <table id="results">
+    <thead id="table-head"></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+  let records = [];
+  let currentTypeFilter = '';
+
+  function normalizeString(str) {
+    return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  }
+
+  async function loadData() {
+    try {
+      const response = await fetch("records.json?t=" + new Date().getTime());
+      records = await response.json();
+
+      const regionSet = new Set();
+      records.forEach(record => {
+        if (record.parish) regionSet.add(record.parish);
+      });
+
+      const regionSelect = document.getElementById("region");
+      for (const region of [...regionSet].sort()) {
+        const option = document.createElement("option");
+        option.value = region;
+        option.textContent = region;
+        regionSelect.appendChild(option);
+      }
+    } catch (err) {
+      alert("Failed to load records.json: " + err.message);
+    }
+  }
+
+  function startSearch() {
+    document.getElementById("homeSection").style.display = "none";
+    document.getElementById("searchSection").style.display = "block";
+    setTypeFilter(""); // load all by default
+  }
+
+  function setTypeFilter(type) {
+    currentTypeFilter = type;
+    searchRecords();
+
+    document.querySelectorAll(".tab-button").forEach(btn => btn.classList.remove("active"));
+    const tabLabels = {
+      "": "📋 All",
+      "Narození": "🍼 Births",
+      "Sňatek": "💍 Marriages",
+      "Úmrtí": "⚰️ Deaths"
+    };
+
+    document.querySelectorAll(".tab-button").forEach(btn => {
+      if (btn.textContent.includes(tabLabels[type])) {
+        btn.classList.add("active");
+      }
+    });
+  }
+
+  function searchRecords() {
+    const surnameQuery = document.getElementById("surname").value;
+    const regionQuery = document.getElementById("region").value;
+    const tbody = document.querySelector("#results tbody");
+    const thead = document.getElementById("table-head");
+
+    tbody.innerHTML = '';
+    thead.innerHTML = '';
+
+    const filtered = records.filter(record => {
+      const surnameMatch = normalizeString(record.surname).includes(normalizeString(surnameQuery));
+      const regionMatch = regionQuery === '' || record.parish === regionQuery;
+      const typeMatch = currentTypeFilter === '' || record.type === currentTypeFilter;
+      return surnameMatch && regionMatch && typeMatch;
+    });
+
+    filtered.sort((a, b) => Number(a.year) - Number(b.year));
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10">No results found / Žádné výsledky.</td></tr>';
+      return;
+    }
+
+    // Build header
+    const baseHeaders = ["Jméno", "Příjmení", "Farnost", "Rok", "Druh"];
+    let extraHeaders = [];
+
+    if (currentTypeFilter === "Narození") extraHeaders = ["Rodiče / Parents"];
+    else if (currentTypeFilter === "Sňatek") extraHeaders = ["Manžel / Spouse"];
+    else if (currentTypeFilter === "Úmrtí") extraHeaders = ["Věk / Age", "Příčina / Cause"];
+
+    const allHeaders = [...baseHeaders, ...extraHeaders, "Záznam"];
+    const headerRow = document.createElement("tr");
+    allHeaders.forEach(h => {
+      const th = document.createElement("th");
+      th.textContent = h;
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+
+    // Render rows
+    for (const record of filtered) {
+      let rowHTML = `
+        <tr>
+          <td>${record.firstName}</td>
+          <td>${record.surname}</td>
+          <td>${record.parish}</td>
+          <td>${record.year}</td>
+          <td>${record.type}</td>
+      `;
+
+      if (currentTypeFilter === "Narození") {
+        rowHTML += `<td>${record.parents || ''}</td>`;
+      } else if (currentTypeFilter === "Sňatek") {
+        rowHTML += `<td>${record.spouse || ''}</td>`;
+      } else if (currentTypeFilter === "Úmrtí") {
+        rowHTML += `<td>${record.age || ''}</td><td>${record.cause || ''}</td>`;
+      }
+
+      rowHTML += `<td><a href="${record.link}" target="_blank">Zobrazit / View</a></td></tr>`;
+      tbody.insertAdjacentHTML('beforeend', rowHTML);
+    }
+  }
+
+  window.onload = loadData;
+</script>
+</body>
+</html>
