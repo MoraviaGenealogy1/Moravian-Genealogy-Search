@@ -76,9 +76,48 @@
     <tbody></tbody>
   </table>
 </div>
+<button id="loadMoreBtn" style="display: none;" onclick="loadMoreRecords()">Load More</button>
 
 <script>
+function loadNextBatch() {
+  const tbody = document.querySelector("#results tbody");
+  const loadMoreBtn = document.getElementById("loadMoreBtn");
+  const nextBatch = filteredRecords.slice(currentDisplayIndex, currentDisplayIndex + pageSize);
+
+  for (const record of nextBatch) {
+    let rowHTML = `
+      <tr>
+        <td>${record.firstName}</td>
+        <td>${record.surname}</td>
+        <td>${record.parish}</td>
+        <td>${record.year}</td>
+        <td>${record.type}</td>
+    `;
+
+    if (record.type === "Narození") {
+      rowHTML += `<td>${record.parents || ''}</td>`;
+    } else if (record.type === "Sňatek") {
+      rowHTML += `<td>${record.spouse || ''}</td>`;
+    } else if (record.type === "Úmrtí") {
+      rowHTML += `<td>${record.age || ''}</td><td>${record.cause || ''}</td>`;
+    }
+
+    rowHTML += `<td><a href="${record.link}" target="_blank">Zobrazit / View</a></td></tr>`;
+    tbody.insertAdjacentHTML('beforeend', rowHTML);
+  }
+
+  currentDisplayIndex += pageSize;
+
+  // Hide button if done
+  if (currentDisplayIndex >= filteredRecords.length) {
+    loadMoreBtn.style.display = 'none';
+  }
+}
+
   let records = [];
+let filteredRecords = [];
+let currentDisplayIndex = 0;
+const pageSize = 50;
   let currentTypeFilter = '';
 
   function normalizeString(str) {
@@ -133,44 +172,54 @@
   }
 
   function searchRecords() {
-    const surnameQuery = document.getElementById("surname").value;
-    const regionQuery = document.getElementById("region").value;
-    const tbody = document.querySelector("#results tbody");
-    const thead = document.getElementById("table-head");
+  const surnameQuery = document.getElementById("surname").value;
+  const regionQuery = document.getElementById("region").value;
+  const tbody = document.querySelector("#results tbody");
+  const thead = document.getElementById("table-head");
+  const loadMoreBtn = document.getElementById("loadMoreBtn");
 
-    tbody.innerHTML = '';
-    thead.innerHTML = '';
+  tbody.innerHTML = '';
+  thead.innerHTML = '';
+  currentDisplayIndex = 0;
 
-    const filtered = records.filter(record => {
-      const surnameMatch = normalizeString(record.surname).includes(normalizeString(surnameQuery));
-      const regionMatch = regionQuery === '' || record.parish === regionQuery;
-      const typeMatch = currentTypeFilter === '' || record.type === currentTypeFilter;
-      return surnameMatch && regionMatch && typeMatch;
-    });
+  filteredRecords = records.filter(record => {
+    const surnameMatch = normalizeString(record.surname).includes(normalizeString(surnameQuery));
+    const regionMatch = regionQuery === '' || record.parish === regionQuery;
+    const typeMatch = currentTypeFilter === '' || record.type === currentTypeFilter;
+    return surnameMatch && regionMatch && typeMatch;
+  });
 
-    filtered.sort((a, b) => Number(a.year) - Number(b.year));
+  filteredRecords.sort((a, b) => Number(a.year) - Number(b.year));
 
-    if (filtered.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="10">No results found / Žádné výsledky.</td></tr>';
-      return;
-    }
+  if (filteredRecords.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10">No results found / Žádné výsledky.</td></tr>';
+    loadMoreBtn.style.display = 'none';
+    return;
+  }
 
-    // Build header
-    const baseHeaders = ["Jméno", "Příjmení", "Farnost", "Rok", "Druh"];
-    let extraHeaders = [];
+  // Build dynamic headers
+  const baseHeaders = ["Jméno", "Příjmení", "Farnost", "Rok", "Druh"];
+  let extraHeaders = [];
 
-    if (currentTypeFilter === "Narození") extraHeaders = ["Rodiče / Parents"];
-    else if (currentTypeFilter === "Sňatek") extraHeaders = ["Manžel / Spouse"];
-    else if (currentTypeFilter === "Úmrtí") extraHeaders = ["Věk / Age", "Příčina / Cause"];
+  if (currentTypeFilter === "Narození") extraHeaders = ["Rodiče / Parents"];
+  else if (currentTypeFilter === "Sňatek") extraHeaders = ["Manžel / Spouse"];
+  else if (currentTypeFilter === "Úmrtí") extraHeaders = ["Věk / Age", "Příčina / Cause"];
 
-    const allHeaders = [...baseHeaders, ...extraHeaders, "Záznam"];
-    const headerRow = document.createElement("tr");
-    allHeaders.forEach(h => {
-      const th = document.createElement("th");
-      th.textContent = h;
-      headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
+  const allHeaders = [...baseHeaders, ...extraHeaders, "Záznam"];
+  const headerRow = document.createElement("tr");
+  allHeaders.forEach(h => {
+    const th = document.createElement("th");
+    th.textContent = h;
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+
+  // Load first batch
+  loadNextBatch();
+
+  // Show or hide "Load More" button
+  loadMoreBtn.style.display = filteredRecords.length > pageSize ? 'block' : 'none';
+}
 
     // Render rows
     for (const record of filtered) {
